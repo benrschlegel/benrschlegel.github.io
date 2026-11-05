@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ADC Sampling & Aliasing Simulator</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        dark: {
+                            900: '#0B0F17',
+                            800: '#111827',
+                            700: '#1F2937',
+                            600: '#374151'
+                        },
+                        neon: {
+                            cyan: '#00F0FF',
+                            pink: '#FF007A',
+                            amber: '#FFB800',
+                            green: '#00E676',
+                            purple: '#A855F7'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #0B0F17;
+            color: #E5E7EB;
+        }
+        /* Custom scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #111827;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4B5563;
+        }
+        /* Range input custom styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #00F0FF;
+            cursor: pointer;
+            margin-top: -7px;
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #374151;
+            border-radius: 2px;
+        }
+        /* Glassmorphism panel styling */
+        .glass-panel {
+            background: rgba(17, 24, 39, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+    </style>
+</head>
+<body class="font-sans antialiased min-h-screen flex flex-col">
+
+    <!-- Header Bar -->
+    <header class="glass-panel sticky top-0 z-50 border-b border-gray-800 px-4 py-3 sm:px-6">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2">
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-dark-900 shadow-lg shadow-cyan-500/20">
+                    <i class="fa-solid fa-wave-square text-lg text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+                        ADC Sampling & Aliasing Simulator
+                    </h1>
+                    <p class="text-xs text-gray-400">Time Domain Signal Reconstruction & Frequency Folding Spectrum</p>
+                </div>
+            </div>
+
+            <!-- Global Nyquist Status Badge -->
+            <div id="nyquist-status-badge" class="px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-2 transition-all duration-300 bg-emerald-950/80 text-emerald-400 border border-emerald-500/30">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span id="nyquist-status-text">Nyquist Criterion Satisfied (f_s ≥ 2f_in)</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Left Column: Controls & Metrics (4 cols) -->
+        <div class="lg:col-span-4 flex flex-col gap-6">
+            
+            <!-- Parameters Control Panel -->
+            <div class="glass-panel rounded-xl p-5 shadow-xl">
+                <div class="flex items-center justify-between border-b border-gray-800 pb-3 mb-4">
+                    <h2 class="text-sm font-semibold text-gray-200 uppercase tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-sliders text-cyan-400"></i> Signal Parameters
+                    </h2>
+                    <button id="reset-btn" class="text-xs text-gray-400 hover:text-cyan-400 transition-colors flex items-center gap-1">
+                        <i class="fa-solid fa-rotate-left"></i> Reset
+                    </button>
+                </div>
+
+                <div class="space-y-5">
+                    <!-- Input Frequency (f_in) -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1.5">
+                            <label for="fin-range" class="text-xs font-medium text-gray-300">Input Signal Freq (<span class="text-cyan-400">f<sub>in</sub></span>)</label>
+                            <div class="flex items-center gap-1 bg-dark-900 border border-gray-700 rounded px-2 py-0.5">
+                                <input type="number" id="fin-num" min="1" max="100" value="10" class="w-12 bg-transparent text-right text-xs font-mono text-cyan-400 outline-none">
+                                <span class="text-xs text-gray-500 font-mono">kHz</span>
+                            </div>
+                        </div>
+                        <input type="range" id="fin-range" min="1" max="100" step="1" value="10" class="w-full">
+                        <div class="flex justify-between text-[10px] text-gray-500 mt-1 font-mono">
+                            <span>1 kHz</span>
+                            <span>50 kHz</span>
+                            <span>100 kHz</span>
+                        </div>
+                    </div>
+
+                    <!-- Sampling Frequency (f_s) -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1.5">
+                            <label for="fs-range" class="text-xs font-medium text-gray-300">ADC Sampling Freq (<span class="text-neon-pink">f<sub>s</sub></span>)</label>
+                            <div class="flex items-center gap-1 bg-dark-900 border border-gray-700 rounded px-2 py-0.5">
+                                <input type="number" id="fs-num" min="5" max="150" value="50" class="w-12 bg-transparent text-right text-xs font-mono text-neon-pink outline-none">
+                                <span class="text-xs text-gray-500 font-mono">kHz</span>
+                            </div>
+                        </div>
+                        <input type="range" id="fs-range" min="5" max="150" step="1" value="50" class="w-full">
+                        <div class="flex justify-between text-[10px] text-gray-500 mt-1 font-mono">
+                            <span>5 kHz</span>
+                            <span>75 kHz</span>
+                            <span>150 kHz</span>
+                        </div>
+                    </div>
+
+                    <!-- Harmonic Selection -->
+                    <div class="pt-2 border-t border-gray-800">
+                        <label class="text-xs font-medium text-gray-300 mb-2 block">Waveform Harmonics profile</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="flex items-center gap-2 p-2 rounded bg-dark-900 border border-gray-800 cursor-pointer hover:border-gray-700 transition-colors">
+                                <input type="radio" name="harmonic-preset" value="pure" checked class="text-cyan-400 focus:ring-0 bg-transparent">
+                                <span class="text-xs text-gray-300">Pure Sine Wave</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-2 rounded bg-dark-900 border border-gray-800 cursor-pointer hover:border-gray-700 transition-colors">
+                                <input type="radio" name="harmonic-preset" value="square" class="text-cyan-400 focus:ring-0 bg-transparent">
+                                <span class="text-xs text-gray-300">Square (Odd)</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-2 rounded bg-dark-900 border border-gray-800 cursor-pointer hover:border-gray-700 transition-colors">
+                                <input type="radio" name="harmonic-preset" value="sawtooth" class="text-cyan-400 focus:ring-0 bg-transparent">
+                                <span class="text-xs text-gray-300">Sawtooth (All)</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-2 rounded bg-dark-900 border border-gray-800 cursor-pointer hover:border-gray-700 transition-colors">
+                                <input type="radio" name="harmonic-preset" value="custom" class="text-cyan-400 focus:ring-0 bg-transparent">
+                                <span class="text-xs text-gray-300">3rd & 5th Only</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Display Mode Options -->
+                    <div class="pt-2 border-t border-gray-800 flex items-center justify-between">
+                        <span class="text-xs font-medium text-gray-300">Show Phantom Reconstruction</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="toggle-reconstructed" checked class="sr-only peer">
+                            <div class="w-9 h-5 bg-dark-900 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-gray-300 after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
+                        </label>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Mathematical Metrics Card -->
+            <div class="glass-panel rounded-xl p-5 shadow-xl space-y-3">
+                <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-800 pb-2">
+                    Calculated Dynamics
+                </h3>
+
+                <div class="grid grid-cols-2 gap-3 font-mono">
+                    <div class="bg-dark-900 p-2.5 rounded-lg border border-gray-800/80">
+                        <div class="text-[10px] text-gray-500 uppercase">Nyquist Limit (f<sub>N</sub>)</div>
+                        <div id="nyquist-val" class="text-base font-bold text-emerald-400 mt-0.5">25.0 kHz</div>
+                        <div class="text-[9px] text-gray-600 mt-0.5">Max un-aliased freq</div>
+                    </div>
+                    <div class="bg-dark-900 p-2.5 rounded-lg border border-gray-800/80">
+                        <div class="text-[10px] text-gray-500 uppercase">Fundamental Alias</div>
+                        <div id="alias-val" class="text-base font-bold text-neon-amber mt-0.5">10.0 kHz</div>
+                        <div id="alias-subtext" class="text-[9px] text-gray-500 mt-0.5">No folding active</div>
+                    </div>
+                </div>
+
+                <!-- Harmonics Aliasing Table -->
+                <div class="pt-2">
+                    <div class="text-xs font-medium text-gray-400 mb-2">Harmonics Spectrum Analysis:</div>
+                    <div class="bg-dark-900 rounded-lg border border-gray-800 overflow-hidden">
+                        <table class="w-full text-left text-[11px] font-mono">
+                            <thead class="bg-gray-800/50 text-gray-400 border-b border-gray-800">
+                                <tr>
+                                    <th class="p-1.5">Harmonic</th>
+                                    <th class="p-1.5">Actual Freq</th>
+                                    <th class="p-1.5">Measured Freq</th>
+                                    <th class="p-1.5">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="harmonics-table-body" class="divide-y divide-gray-800 text-gray-300">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Theoretical Info Box -->
+            <div class="glass-panel rounded-xl p-4 border border-cyan-500/20 bg-cyan-950/10 text-xs space-y-2">
+                <div class="flex items-center gap-2 text-cyan-400 font-semibold">
+                    <i class="fa-solid fa-circle-info"></i> Aliasing & Frequency Folding
+                </div>
+                <p class="text-gray-300 leading-relaxed text-[11px]">
+                    When $f_{in} > f_s/2$, high frequencies fold into the baseband $[0, f_s/2]$ around integer multiples of the sampling frequency:
+                </p>
+                <div class="bg-dark-900 p-2 rounded text-center font-mono text-cyan-300 text-[11px] border border-cyan-500/30">
+                    f<sub>apparent</sub> = | f<sub>in</sub> - k · f<sub>s</sub> |
+                </div>
+                <p class="text-gray-400 text-[10px]">
+                    Higher harmonics follow the exact same folding behavior, distorting the recovered wave in unpredictable ways.
+                </p>
+            </div>
+
+        </div>
+
+        <!-- Right Column: Interactive Graphs (8 cols) -->
+        <div class="lg:col-span-8 flex flex-col gap-6">
+
+            <!-- Time Domain Plot -->
+            <div class="glass-panel rounded-xl p-5 shadow-xl flex flex-col flex-1 min-h-[340px]">
+                <div class="flex flex-wrap justify-between items-center mb-3 gap-2">
+                    <div>
+                        <h2 class="text-sm font-semibold text-gray-200 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-line text-cyan-400"></i> Time Domain Waveform Sampling
+                        </h2>
+                        <p class="text-xs text-gray-400">Continuous signal vs. Discrete ADC sample points</p>
+                    </div>
+                    <div class="flex items-center gap-4 text-xs font-medium">
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-3 h-0.5 bg-cyan-400 rounded"></span>
+                            <span class="text-gray-300">True Signal</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-neon-pink"></span>
+                            <span class="text-gray-300">ADC Samples</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-3 h-0.5 bg-neon-amber border border-dashed border-neon-amber"></span>
+                            <span class="text-gray-300">Reconstructed</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="relative flex-grow w-full h-[260px]">
+                    <canvas id="timeDomainCanvas"></canvas>
+                </div>
+            </div>
+
+            <!-- Frequency Domain Plot -->
+            <div class="glass-panel rounded-xl p-5 shadow-xl flex flex-col flex-1 min-h-[340px]">
+                <div class="flex flex-wrap justify-between items-center mb-3 gap-2">
+                    <div>
+                        <h2 class="text-sm font-semibold text-gray-200 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-column text-neon-purple"></i> Frequency Domain (Magnitude Spectrum)
+                        </h2>
+                        <p class="text-xs text-gray-400">True input harmonics vs. Aliased baseband reflections</p>
+                    </div>
+                    <div class="flex items-center gap-4 text-xs font-medium">
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 bg-cyan-400 rounded-sm"></span>
+                            <span class="text-gray-300">True Harmonics</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 bg-neon-amber rounded-sm"></span>
+                            <span class="text-gray-300">Aliased Signal</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-3 h-0.5 border-t-2 border-dashed border-emerald-400"></span>
+                            <span class="text-gray-300">Nyquist Limit</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="relative flex-grow w-full h-[260px]">
+                    <canvas id="freqDomainCanvas"></canvas>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-gray-800 text-center py-4 text-xs text-gray-500">
+        ADC Sampling & Aliasing Visualizer &bull; DSP Signal Processing Interactive Tool
+    </footer>
+
+    <!-- Application Script -->
+    <script>
+        // --- State Management ---
+        const state = {
+            fin: 10,       // kHz
+            fs: 50,        // kHz
+            preset: 'pure',// 'pure', 'square', 'sawtooth', 'custom'
+            showReconstructed: true
+        };
+
+        // DOM Element Cache
+        const elements = {
+            finRange: document.getElementById('fin-range'),
+            finNum: document.getElementById('fin-num'),
+            fsRange: document.getElementById('fs-range'),
+            fsNum: document.getElementById('fs-num'),
+            nyquistBadge: document.getElementById('nyquist-status-badge'),
+            nyquistStatusText: document.getElementById('nyquist-status-text'),
+            nyquistVal: document.getElementById('nyquist-val'),
+            aliasVal: document.getElementById('alias-val'),
+            aliasSubtext: document.getElementById('alias-subtext'),
+            harmonicsTableBody: document.getElementById('harmonics-table-body'),
+            resetBtn: document.getElementById('reset-btn'),
+            toggleReconstructed: document.getElementById('toggle-reconstructed')
+        };
+
+        let timeChart = null;
+        let freqChart = null;
+
+        // --- Harmonic Profile Generator ---
+        function getHarmonicsProfile(fundamentalFreq, preset) {
+            const harmonics = [];
+            
+            switch(preset) {
+                case 'pure':
+                    harmonics.push({ order: 1, freq: fundamentalFreq, amp: 1.0 });
+                    break;
+                case 'square':
+                    // Odd harmonics: 1, 3, 5, 7 (amps: 1/1, 1/3, 1/5, 1/7)
+                    for (let n = 1; n <= 7; n += 2) {
+                        if (fundamentalFreq * n <= 300) { // Keep reasonable freq ceiling
+                            harmonics.push({ order: n, freq: fundamentalFreq * n, amp: 1.0 / n });
+                        }
+                    }
+                    break;
+                case 'sawtooth':
+                    // All harmonics: 1, 2, 3, 4, 5 (amps: 1/n)
+                    for (let n = 1; n <= 5; n++) {
+                        if (fundamentalFreq * n <= 300) {
+                            harmonics.push({ order: n, freq: fundamentalFreq * n, amp: 1.0 / n });
+                        }
+                    }
+                    break;
+                case 'custom':
+                    // Fundamental + 3rd + 5th
+                    harmonics.push({ order: 1, freq: fundamentalFreq, amp: 1.0 });
+                    if (fundamentalFreq * 3 <= 300) harmonics.push({ order: 3, freq: fundamentalFreq * 3, amp: 0.5 });
+                    if (fundamentalFreq * 5 <= 300) harmonics.push({ order: 5, freq: fundamentalFreq * 5, amp: 0.25 });
+                    break;
+            }
+            return harmonics;
+        }
+
+        // --- Calculate Folded / Aliased Frequency ---
+        function calculateAliasedFrequency(freq, fs) {
+            const nyquist = fs / 2;
+            const rem = freq % fs;
+            let alias = rem;
+            if (rem > nyquist) {
+                alias = fs - rem;
+            }
+            return alias;
+        }
+
+        // --- Chart Initialization ---
+        function initCharts() {
+            // Chart.js Dark Mode Defaults
+            Chart.defaults.color = '#9CA3AF';
+            Chart.defaults.font.family = 'Inter';
+
+            // 1. Time Domain Chart
+            const ctxTime = document.getElementById('timeDomainCanvas').getContext('2d');
+            timeChart = new Chart(ctxTime, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'Continuous Input Signal',
+                            data: [],
+                            borderColor: '#00F0FF',
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            tension: 0.3,
+                            order: 2
+                        },
+                        {
+                            label: 'ADC Discrete Samples',
+                            data: [],
+                            borderColor: '#FF007A',
+                            backgroundColor: '#FF007A',
+                            pointRadius: 5,
+                            pointHoverRadius: 7,
+                            showLine: false,
+                            order: 1
+                        },
+                        {
+                            label: 'Reconstructed / Phantom Wave',
+                            data: [],
+                            borderColor: '#FFB800',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            pointRadius: 0,
+                            tension: 0.3,
+                            order: 3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 150 },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            title: { display: true, text: 'Time (microseconds - µs)', color: '#6B7280', font: { size: 11 } },
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                        },
+                        y: {
+                            min: -1.6,
+                            max: 1.6,
+                            title: { display: true, text: 'Amplitude (V)', color: '#6B7280', font: { size: 11 } },
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)} V`
+                            }
+                        }
+                    }
+                }
+            });
+
+            // 2. Frequency Domain Chart
+            const ctxFreq = document.getElementById('freqDomainCanvas').getContext('2d');
+            freqChart = new Chart(ctxFreq, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'True Harmonics',
+                            data: [],
+                            backgroundColor: '#00F0FF',
+                            barThickness: 6,
+                            borderRadius: 3
+                        },
+                        {
+                            label: 'Aliased (Folded) Components',
+                            data: [],
+                            backgroundColor: '#FFB800',
+                            barThickness: 6,
+                            borderRadius: 3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 150 },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            title: { display: true, text: 'Frequency (kHz)', color: '#6B7280', font: { size: 11 } },
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            min: 0,
+                            max: 120
+                        },
+                        y: {
+                            min: 0,
+                            max: 1.2,
+                            title: { display: true, text: 'Magnitude', color: '#6B7280', font: { size: 11 } },
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                title: (items) => `${items[0].parsed.x.toFixed(1)} kHz`,
+                                label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}`
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Custom plugin to draw Nyquist line on Frequency Domain canvas
+        const nyquistLinePlugin = {
+            id: 'nyquistLine',
+            afterDraw: (chart) => {
+                if (chart.canvas.id !== 'freqDomainCanvas') return;
+
+                const xAxis = chart.scales.x;
+                const yAxis = chart.scales.y;
+                const nyquistFreq = state.fs / 2;
+
+                const xPixel = xAxis.getPixelForValue(nyquistFreq);
+
+                if (xPixel >= xAxis.left && xPixel <= xAxis.right) {
+                    const ctx = chart.ctx;
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.setLineDash([4, 4]);
+                    ctx.moveTo(xPixel, yAxis.top);
+                    ctx.lineTo(xPixel, yAxis.bottom);
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = '#00E676';
+                    ctx.stroke();
+
+                    // Text Label
+                    ctx.fillStyle = '#00E676';
+                    ctx.font = '600 10px Inter';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`Nyquist (${nyquistFreq.toFixed(1)} kHz)`, xPixel, yAxis.top - 6);
+                    ctx.restore();
+                }
+            }
+        };
+        Chart.register(nyquistLinePlugin);
+
+        // --- Main Simulation Update Render Loop ---
+        function updateSimulation() {
+            const { fin, fs, preset, showReconstructed } = state;
+            const nyquist = fs / 2;
+            const isAliased = fin > nyquist;
+
+            // 1. Update Header UI Badges & Numerical Indicators
+            if (isAliased) {
+                elements.nyquistBadge.className = 'px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-2 transition-all duration-300 bg-rose-950/80 text-rose-400 border border-rose-500/30';
+                elements.nyquistStatusText.innerText = `Aliasing Detected (f_in > f_s/2)`;
+            } else {
+                elements.nyquistBadge.className = 'px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-2 transition-all duration-300 bg-emerald-950/80 text-emerald-400 border border-emerald-500/30';
+                elements.nyquistStatusText.innerText = `Nyquist Criterion Satisfied (f_s ≥ 2f_in)`;
+            }
+
+            elements.nyquistVal.innerText = `${nyquist.toFixed(1)} kHz`;
+            const mainAlias = calculateAliasedFrequency(fin, fs);
+            elements.aliasVal.innerText = `${mainAlias.toFixed(1)} kHz`;
+            elements.aliasSubtext.innerText = isAliased ? `Folded from ${fin} kHz` : `Identical to f_in`;
+            elements.aliasVal.className = `text-base font-bold mt-0.5 ${isAliased ? 'text-neon-amber' : 'text-cyan-400'}`;
+
+            // 2. Compute Harmonics Spectrum
+            const harmonics = getHarmonicsProfile(fin, preset);
+
+            // Update Harmonics Dynamic Table
+            elements.harmonicsTableBody.innerHTML = harmonics.map(h => {
+                const hAlias = calculateAliasedFrequency(h.freq, fs);
+                const hIsAliased = h.freq > nyquist;
+                return `
+                    <tr class="hover:bg-gray-800/40 transition-colors">
+                        <td class="p-1.5 font-semibold text-gray-200">h<sub>${h.order}</sub> (${(h.amp*100).toFixed(0)}%)</td>
+                        <td class="p-1.5 text-cyan-400">${h.freq.toFixed(1)} kHz</td>
+                        <td class="p-1.5 ${hIsAliased ? 'text-neon-amber font-bold' : 'text-emerald-400'}">${hAlias.toFixed(1)} kHz</td>
+                        <td class="p-1.5">
+                            <span class="px-1.5 py-0.5 rounded text-[9px] ${hIsAliased ? 'bg-amber-950 text-neon-amber border border-amber-800' : 'bg-emerald-950 text-emerald-400 border border-emerald-800'}">
+                                ${hIsAliased ? 'Aliased' : 'Clean'}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            // 3. Generate Time-Domain Data Points
+            // Time window: show 3 cycles of fundamental (or at least 200 µs)
+            const timeWindowUs = Math.max(250, (3 / fin) * 1000); 
+            const timeStepUs = timeWindowUs / 400; // 400 points for smooth continuous curve
+
+            const continuousPoints = [];
+            const samplePoints = [];
+            const reconstructedPoints = [];
+
+            // Continuous input waveform function
+            const evalTrueWave = (tUs) => {
+                const tSec = tUs * 1e-6;
+                let val = 0;
+                harmonics.forEach(h => {
+                    val += h.amp * Math.sin(2 * Math.PI * (h.freq * 1e3) * tSec);
+                });
+                return val;
+            };
+
+            // Reconstructed (Phantom) wave function based on folded frequencies
+            const evalReconstructedWave = (tUs) => {
+                const tSec = tUs * 1e-6;
+                let val = 0;
+                harmonics.forEach(h => {
+                    const fFolded = calculateAliasedFrequency(h.freq, fs);
+                    
+                    // Determine phase flip based on folding zone k
+                    const k = Math.floor(h.freq / fs);
+                    const rem = h.freq % fs;
+                    const phaseSign = (rem > nyquist) ? -1 : 1;
+
+                    val += h.amp * phaseSign * Math.sin(2 * Math.PI * (fFolded * 1e3) * tSec);
+                });
+                return val;
+            };
+
+            // Generate Continuous Curve
+            for (let t = 0; t <= timeWindowUs; t += timeStepUs) {
+                continuousPoints.push({ x: t, y: evalTrueWave(t) });
+                if (showReconstructed) {
+                    reconstructedPoints.push({ x: t, y: evalReconstructedWave(t) });
+                }
+            }
+
+            // Generate Discrete Sample Points (spaced at Ts = 1/fs)
+            const TsUs = (1 / fs) * 1000; // Sample period in µs
+            for (let t = 0; t <= timeWindowUs; t += TsUs) {
+                samplePoints.push({ x: t, y: evalTrueWave(t) });
+            }
+
+            // Update Time Chart Datasets
+            timeChart.data.datasets[0].data = continuousPoints;
+            timeChart.data.datasets[1].data = samplePoints;
+            timeChart.data.datasets[2].data = showReconstructed ? reconstructedPoints : [];
+            timeChart.options.scales.x.max = timeWindowUs;
+            timeChart.update('none');
+
+            // 4. Generate Frequency-Domain Data Points
+            const trueFreqData = [];
+            const aliasFreqData = [];
+
+            // Max scale for x-axis in frequency plot
+            const maxDisplayFreq = Math.max(fs * 1.2, fin * 1.5, 60);
+            freqChart.options.scales.x.max = maxDisplayFreq;
+
+            harmonics.forEach(h => {
+                trueFreqData.push({ x: h.freq, y: h.amp });
+                const fAlias = calculateAliasedFrequency(h.freq, fs);
+                
+                // If aliased (or even if clean), show where it registers in baseband
+                if (h.freq > nyquist) {
+                    aliasFreqData.push({ x: fAlias, y: h.amp });
+                } else {
+                    // Fits within baseband natively
+                    aliasFreqData.push({ x: fAlias, y: 0 }); 
+                }
+            });
+
+            freqChart.data.datasets[0].data = trueFreqData;
+            freqChart.data.datasets[1].data = aliasFreqData;
+            freqChart.update('none');
+        }
+
+        // --- Event Listeners & Binding ---
+        function bindEvents() {
+            // Slider / Input sync for f_in
+            elements.finRange.addEventListener('input', (e) => {
+                state.fin = parseFloat(e.target.value);
+                elements.finNum.value = state.fin;
+                updateSimulation();
+            });
+            elements.finNum.addEventListener('change', (e) => {
+                let val = Math.min(100, Math.max(1, parseFloat(e.target.value) || 1));
+                state.fin = val;
+                elements.finRange.value = val;
+                elements.finNum.value = val;
+                updateSimulation();
+            });
+
+            // Slider / Input sync for f_s
+            elements.fsRange.addEventListener('input', (e) => {
+                state.fs = parseFloat(e.target.value);
+                elements.fsNum.value = state.fs;
+                updateSimulation();
+            });
+            elements.fsNum.addEventListener('change', (e) => {
+                let val = Math.min(150, Math.max(5, parseFloat(e.target.value) || 5));
+                state.fs = val;
+                elements.fsRange.value = val;
+                elements.fsNum.value = val;
+                updateSimulation();
+            });
+
+            // Harmonic presets radio selection
+            document.querySelectorAll('input[name="harmonic-preset"]').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    state.preset = e.target.value;
+                    updateSimulation();
+                });
+            });
+
+            // Toggle phantom wave visibility
+            elements.toggleReconstructed.addEventListener('change', (e) => {
+                state.showReconstructed = e.target.checked;
+                updateSimulation();
+            });
+
+            // Reset button
+            elements.resetBtn.addEventListener('click', () => {
+                state.fin = 10;
+                state.fs = 50;
+                state.preset = 'pure';
+                state.showReconstructed = true;
+
+                elements.finRange.value = 10;
+                elements.finNum.value = 10;
+                elements.fsRange.value = 50;
+                elements.fsNum.value = 50;
+                elements.toggleReconstructed.checked = true;
+                document.querySelector('input[name="harmonic-preset"][value="pure"]').checked = true;
+
+                updateSimulation();
+            });
+        }
+
+        // Initialization on Load
+        window.onload = () => {
+            initCharts();
+            bindEvents();
+            updateSimulation();
+        };
+    </script>
+</body>
+</html>

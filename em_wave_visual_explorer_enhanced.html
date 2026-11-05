@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Electromagnetic Wave Interactive Visualizer</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- KaTeX for rendering math formulas -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+    <!-- Three.js for 3D graphics -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            cyan: '#06b6d4',
+                            purple: '#8b5cf6',
+                            amber: '#f59e0b',
+                            rose: '#f43f5e',
+                            emerald: '#10b981',
+                            blue: '#3b82f6',
+                            dark: '#0f172a',
+                            darker: '#020617'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #020617;
+            color: #f8fafc;
+            overflow-x: hidden;
+        }
+        .code-font {
+            font-family: 'Fira Code', monospace;
+        }
+        /* Custom scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+        .glow-cyan {
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.25);
+        }
+        .glow-purple {
+            box-shadow: 0 0 15px rgba(139, 92, 246, 0.25);
+        }
+        .term-active {
+            transform: translateY(-2px);
+            box-shadow: 0 0 12px currentColor;
+        }
+        canvas {
+            outline: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-950 text-slate-100">
+
+    <!-- Top Navigation Header -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg text-cyan-400">
+                    <i class="fa-solid fa-wave-square text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight text-white flex items-center gap-2">
+                        Uniform Plane Wave Visualizer
+                        <span class="text-xs px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800">EM Theory</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Interactive Wave Function & Electromagnetic Parameter Exploration</p>
+                </div>
+            </div>
+
+            <!-- View Mode Toggles & Controls -->
+            <div class="flex items-center gap-2">
+                <button id="btn-reset" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-lg border border-slate-700 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-rotate-left"></i> Reset Defaults
+                </button>
+                <button id="btn-view-mode" class="px-3 py-1.5 bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 text-xs font-medium rounded-lg border border-indigo-500/40 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-cube"></i> Toggle View Mode (3D/2D)
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 grid grid-cols-1 lg:grid-cols-12 gap-5">
+
+        <!-- LEFT COLUMN: Visualization & Interactive Math (7 Cols) -->
+        <div class="lg:col-span-7 flex flex-col gap-5">
+            
+            <!-- Dynamic Math Equation Interactive Diagram -->
+            <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-5 shadow-xl relative overflow-hidden">
+                <div class="flex items-center justify-between mb-3 border-b border-slate-800 pb-2">
+                    <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                        <i class="fa-solid fa-square-root-variable text-purple-400"></i> Interactive Math Equation Breakdown
+                    </h2>
+                    <span class="text-xs text-cyan-400 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/50">Click any term to highlight relationship</span>
+                </div>
+
+                <!-- Equation Display Bar -->
+                <div class="py-4 px-3 bg-slate-950/80 rounded-xl border border-slate-800 flex flex-col items-center justify-center gap-2 overflow-x-auto min-h-[90px]">
+                    <div id="equation-katex" class="text-lg md:text-2xl font-mono text-amber-400 text-center select-none cursor-pointer"></div>
+                    <div id="equation-b-katex" class="text-md md:text-xl font-mono text-emerald-400 text-center select-none cursor-pointer border-t border-slate-800/80 pt-2 w-full"></div>
+                </div>
+
+                <!-- Interactive Term Badges -->
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-4">
+                    <button data-term="Ex" class="term-btn p-2.5 rounded-lg border text-left transition text-xs flex flex-col gap-1 bg-slate-800/40 border-slate-700/60 hover:border-cyan-500/50">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-cyan-400">$E_x$</span>
+                            <span class="text-[10px] text-slate-400">Vector</span>
+                        </div>
+                        <span class="text-slate-300 text-[11px] truncate">Electric Field Vector</span>
+                    </button>
+
+                    <button data-term="By" class="term-btn p-2.5 rounded-lg border text-left transition text-xs flex flex-col gap-1 bg-slate-800/40 border-slate-700/60 hover:border-emerald-500/50">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-emerald-400">$B_y$</span>
+                            <span class="text-[10px] text-slate-400">Magnetic</span>
+                        </div>
+                        <span class="text-slate-300 text-[11px] truncate">Magnetic Field Vector</span>
+                    </button>
+
+                    <button data-term="E0" class="term-btn p-2.5 rounded-lg border text-left transition text-xs flex flex-col gap-1 bg-slate-800/40 border-slate-700/60 hover:border-amber-500/50">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-amber-400">$E_0$</span>
+                            <span class="text-[10px] text-slate-400">Amplitude</span>
+                        </div>
+                        <span class="text-slate-300 text-[11px] truncate">Peak Amplitude (V/m)</span>
+                    </button>
+
+                    <button data-term="omega" class="term-btn p-2.5 rounded-lg border text-left transition text-xs flex flex-col gap-1 bg-slate-800/40 border-slate-700/60 hover:border-purple-500/50">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-purple-400">$\omega$</span>
+                            <span class="text-[10px] text-slate-400">Temporal</span>
+                        </div>
+                        <span class="text-slate-300 text-[11px] truncate">Angular Freq (rad/s)</span>
+                    </button>
+
+                    <button data-term="beta" class="term-btn p-2.5 rounded-lg border text-left transition text-xs flex flex-col gap-1 bg-slate-800/40 border-slate-700/60 hover:border-emerald-500/50">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-emerald-400">$\beta$</span>
+                            <span class="text-[10px] text-slate-400">Spatial</span>
+                        </div>
+                        <span class="text-slate-300 text-[11px] truncate">Phase Constant (rad/m)</span>
+                    </button>
+
+                    <button data-term="sign" class="term-btn p-2.5 rounded-lg border text-left transition text-xs flex flex-col gap-1 bg-slate-800/40 border-slate-700/60 hover:border-rose-500/50">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-rose-400">$\pm\beta z$</span>
+                            <span class="text-[10px] text-slate-400">Direction</span>
+                        </div>
+                        <span class="text-slate-300 text-[11px] truncate">Propagation Sign</span>
+                    </button>
+                </div>
+
+                <!-- Explanation Box for Selected Term -->
+                <div id="term-detail-box" class="mt-4 p-3.5 bg-slate-950 border border-cyan-500/30 rounded-lg text-xs leading-relaxed text-slate-300 transition-all">
+                    <div class="font-semibold text-cyan-400 mb-1 flex items-center gap-1.5" id="term-title">
+                        <i class="fa-solid fa-circle-info"></i> Click any mathematical term above to inspect physical details
+                    </div>
+                    <p id="term-desc" class="text-slate-300">
+                        The wave equation $E_x(z,t) = E_0 \cos(\omega t + \beta z - \phi_0)$ describes a linear uniform plane wave polarized in the $\hat{x}$ direction and propagating along the spatial $z$-axis.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Wave Animation Render Canvas -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl flex flex-col">
+                <!-- Canvas Header Bar -->
+                <div class="px-4 py-2.5 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between flex-wrap gap-2">
+                    <div class="flex items-center gap-2 text-xs font-semibold text-slate-300">
+                        <i class="fa-solid fa-chart-line text-cyan-400"></i>
+                        <span>EM Wave Field Animation ($E_x$ & $B_y$)</span>
+                        <span id="badge-propagation" class="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-950 text-emerald-400 border border-emerald-800">
+                            Propagating $-\hat{z}$
+                        </span>
+                    </div>
+
+                    <!-- Animation Playback & Toggle Buttons -->
+                    <div class="flex items-center gap-1.5">
+                        <button id="btn-pause" class="p-1.5 bg-slate-800 hover:bg-slate-700 rounded text-slate-200 text-xs transition" title="Play/Pause">
+                            <i id="pause-icon" class="fa-solid fa-pause"></i>
+                        </button>
+                        <button id="btn-step" class="p-1.5 bg-slate-800 hover:bg-slate-700 rounded text-slate-200 text-xs transition" title="Step Frame Forward">
+                            <i class="fa-solid fa-forward-step"></i>
+                        </button>
+                        <button id="btn-toggle-envelope" class="p-1.5 bg-slate-800 hover:bg-slate-700 rounded text-slate-300 text-xs transition bg-cyan-900" title="Toggle Amplitude Envelope">
+                            <i class="fa-solid fa-border-style"></i>
+                        </button>
+                        <button id="btn-toggle-bfield" class="p-1.5 bg-emerald-950 hover:bg-emerald-900 border border-emerald-800 rounded text-emerald-400 text-xs transition flex items-center gap-1 px-2" title="Toggle Magnetic Field B_y">
+                            <i class="fa-solid fa-magnet"></i> <span class="text-[10px] font-mono">B_y Field</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Canvas Viewport -->
+                <div class="relative w-full h-[360px] bg-slate-950" id="canvas-container">
+                    <canvas id="wave-canvas" class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
+                    
+                    <!-- Overlay Hints & Coordinates -->
+                    <div class="absolute bottom-2 left-3 text-[10px] text-slate-400 pointer-events-none bg-slate-900/80 px-2 py-1 rounded border border-slate-800 font-mono">
+                        Axis: <span class="text-cyan-400">Blue=z (Space)</span> | <span class="text-amber-400">Yellow=Ex (Electric)</span> | <span class="text-emerald-400">Green=By (Magnetic)</span>
+                    </div>
+
+                    <div class="absolute top-2 right-3 text-[10px] text-slate-400 pointer-events-none bg-slate-900/80 px-2 py-1 rounded border border-slate-800 font-mono flex items-center gap-2">
+                        <span>Time $t = <span id="time-readout" class="text-cyan-400 font-bold">0.00</span> s$</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- RIGHT COLUMN: Sliders & Parameter Dashboard (5 Cols) -->
+        <div class="lg:col-span-5 flex flex-col gap-5">
+
+            <!-- Parameter Sliders Control Panel -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl flex flex-col gap-4">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                        <i class="fa-solid fa-sliders text-cyan-400"></i> Wave Parameters Control
+                    </h2>
+                    <span class="text-[10px] font-mono text-slate-400">Interactive Inputs</span>
+                </div>
+
+                <!-- Slider 1: Peak Amplitude E_0 -->
+                <div class="space-y-1.5">
+                    <div class="flex justify-between items-center text-xs">
+                        <label for="slider-E0" class="font-medium text-slate-200 flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block"></span>
+                            Peak Electric Amplitude ($E_0$)
+                        </label>
+                        <span id="val-E0" class="font-mono text-amber-400 font-bold text-xs bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                            5.0 V/m
+                        </span>
+                    </div>
+                    <input type="range" id="slider-E0" min="0.5" max="10.0" step="0.1" value="5.0" class="w-full accent-amber-400 bg-slate-800 h-1.5 rounded-lg cursor-pointer">
+                </div>
+
+                <!-- Slider 2: Angular Frequency omega -->
+                <div class="space-y-1.5">
+                    <div class="flex justify-between items-center text-xs">
+                        <label for="slider-omega" class="font-medium text-slate-200 flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-purple-400 inline-block"></span>
+                            Angular Frequency ($\omega$)
+                        </label>
+                        <span id="val-omega" class="font-mono text-purple-400 font-bold text-xs bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                            3.14 rad/s
+                        </span>
+                    </div>
+                    <input type="range" id="slider-omega" min="0.5" max="12.57" step="0.1" value="3.14" class="w-full accent-purple-400 bg-slate-800 h-1.5 rounded-lg cursor-pointer">
+                </div>
+
+                <!-- Slider 3: Phase Constant / Wavenumber beta -->
+                <div class="space-y-1.5">
+                    <div class="flex justify-between items-center text-xs">
+                        <label for="slider-beta" class="font-medium text-slate-200 flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block"></span>
+                            Phase Constant / Wavenumber ($\beta$)
+                        </label>
+                        <span id="val-beta" class="font-mono text-emerald-400 font-bold text-xs bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                            1.57 rad/m
+                        </span>
+                    </div>
+                    <input type="range" id="slider-beta" min="0.2" max="6.28" step="0.1" value="1.57" class="w-full accent-emerald-400 bg-slate-800 h-1.5 rounded-lg cursor-pointer">
+                </div>
+
+                <!-- Slider 4: Initial Phase Shift phi_0 -->
+                <div class="space-y-1.5">
+                    <div class="flex justify-between items-center text-xs">
+                        <label for="slider-phi" class="font-medium text-slate-200 flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-blue-400 inline-block"></span>
+                            Initial Phase Shift ($\phi_0$)
+                        </label>
+                        <span id="val-phi" class="font-mono text-blue-400 font-bold text-xs bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                            0.00 rad (0°)
+                        </span>
+                    </div>
+                    <input type="range" id="slider-phi" min="-3.14159" max="3.14159" step="0.05" value="0" class="w-full accent-blue-400 bg-slate-800 h-1.5 rounded-lg cursor-pointer">
+                </div>
+
+                <!-- Direction Toggle & Speed -->
+                <div class="pt-2 border-t border-slate-800 grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-[11px] text-slate-400 block mb-1">Spatial Phase Sign</label>
+                        <button id="btn-toggle-sign" class="w-full py-1.5 px-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-rose-400 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1">
+                            <i class="fa-solid fa-right-left"></i> <span id="sign-text" class="font-mono">+$\beta z$ (Propagates $-\hat{z}$)</span>
+                        </button>
+                    </div>
+
+                    <div>
+                        <label class="text-[11px] text-slate-400 block mb-1">Animation Speed</label>
+                        <input type="range" id="slider-speed" min="0.1" max="2.0" step="0.1" value="0.7" class="w-full accent-cyan-400 bg-slate-800 h-1.5 rounded-lg cursor-pointer mt-2">
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Calculated Wave Parameters Dashboard -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl flex flex-col gap-4">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                        <i class="fa-solid fa-calculator text-emerald-400"></i> Calculated Wave Parameters
+                    </h2>
+                    <span class="text-[10px] text-slate-500 font-mono">Live Computed</span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <!-- Wavelength -->
+                    <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-col">
+                        <span class="text-[11px] text-slate-400 font-medium flex items-center gap-1">Wavelength (<span id="lbl-lambda">$\lambda = \frac{2\pi}{\beta}$</span>)</span>
+                        <span id="calc-lambda" class="text-lg font-bold font-mono text-emerald-400 mt-1">4.00 m</span>
+                        <span class="text-[10px] text-slate-500">Spatial period along $z$</span>
+                    </div>
+
+                    <!-- Temporal Period -->
+                    <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-col">
+                        <span class="text-[11px] text-slate-400 font-medium flex items-center gap-1">Temporal Period (<span id="lbl-period">$T = \frac{2\pi}{\omega}$</span>)</span>
+                        <span id="calc-period" class="text-lg font-bold font-mono text-purple-400 mt-1">2.00 s</span>
+                        <span class="text-[10px] text-slate-500">Time per full cycle</span>
+                    </div>
+
+                    <!-- Frequency -->
+                    <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-col">
+                        <span class="text-[11px] text-slate-400 font-medium flex items-center gap-1">Frequency (<span id="lbl-freq">$f = \frac{\omega}{2\pi}$</span>)</span>
+                        <span id="calc-freq" class="text-lg font-bold font-mono text-cyan-400 mt-1">0.50 Hz</span>
+                        <span class="text-[10px] text-slate-500">Cycles per second</span>
+                    </div>
+
+                    <!-- Phase Velocity -->
+                    <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-col">
+                        <span class="text-[11px] text-slate-400 font-medium flex items-center gap-1">Phase Velocity (<span id="lbl-up">$u_p = \frac{\omega}{\beta}$</span>)</span>
+                        <span id="calc-up" class="text-lg font-bold font-mono text-amber-400 mt-1">2.00 m/s</span>
+                        <span class="text-[10px] text-slate-500">Speed of constant phase</span>
+                    </div>
+                </div>
+
+                <!-- Extra EM Relations Card -->
+                <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-xs space-y-2">
+                    <div class="font-semibold text-slate-300 flex items-center justify-between">
+                        <span>Physical Properties Summary</span>
+                        <i class="fa-solid fa-bolt text-amber-400"></i>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-[11px]">
+                        <div class="bg-slate-900 p-2 rounded border border-slate-800">
+                            <span class="text-slate-400 block mb-0.5">Propagation Vector ($\vec{k}$):</span>
+                            <span id="calc-kvector" class="font-mono text-rose-400 font-semibold"></span>
+                        </div>
+                        <div class="bg-slate-900 p-2 rounded border border-slate-800">
+                            <span class="text-slate-400 block mb-0.5">Impedance Relation ($B_y$):</span>
+                            <span id="calc-energy" class="font-mono text-emerald-400 font-semibold"></span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Detailed Physics Explanations Card Footer -->
+    <footer class="max-w-7xl w-full mx-auto p-4 mb-6">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl text-xs space-y-3">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-graduation-cap text-cyan-400"></i> Electromagnetic Wave Mechanics & Orthogonality
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-slate-300 leading-relaxed">
+                <div class="bg-slate-950 p-3.5 rounded-lg border border-slate-800">
+                    <h4 class="font-semibold text-cyan-400 mb-1">1. Transverse Electromagnetic (TEM)</h4>
+                    <p class="text-slate-400 text-[11px]">
+                        Uniform plane waves are TEM waves where both electric field ($\vec{E}$) and magnetic field ($\vec{B}$) are strictly orthogonal to each other and to the direction of propagation ($\vec{k} \perp \vec{E} \perp \vec{B}$).
+                    </p>
+                </div>
+                <div class="bg-slate-950 p-3.5 rounded-lg border border-slate-800">
+                    <h4 class="font-semibold text-amber-400 mb-1">2. Electric Field Polarization ($E_x$)</h4>
+                    <p class="text-slate-400 text-[11px]">
+                        The electric field oscillates along the $x$-axis as governed by $E_x(z,t) = E_0 \cos(\omega t \pm \beta z - \phi_0)\hat{x}$.
+                    </p>
+                </div>
+                <div class="bg-slate-950 p-3.5 rounded-lg border border-slate-800">
+                    <h4 class="font-semibold text-emerald-400 mb-1">3. Magnetic Field Coupling ($B_y$)</h4>
+                    <p class="text-slate-400 text-[11px]">
+                        The magnetic field oscillates along the orthogonal $y$-axis in phase with $\vec{E}$, satisfying Maxwell's equations and wave impedance relationships in the medium.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Logic and WebGL Rendering Script -->
+    <script>
+        // Term descriptions dataset for interactive breakdown
+        const termData = {
+            Ex: {
+                title: "Ex: Electric Field Component (V/m)",
+                color: "text-cyan-400",
+                desc: "Represents the instant vector value of the Electric Field polarized along the x-axis. It oscillates sinusoidally in both spatial position z and temporal time t."
+            },
+            By: {
+                title: "By: Magnetic Field Component (T)",
+                color: "text-emerald-400",
+                desc: "Represents the orthogonal Magnetic Field vector oscillating along the y-axis, perpendicular to both propagation axis z and electric field x."
+            },
+            E0: {
+                title: "E0: Peak Amplitude (V/m)",
+                color: "text-amber-400",
+                desc: "Maximum electric field magnitude. Energy density in the wave is directly proportional to E₀² (u_e = ½ ε₀ E₀²)."
+            },
+            omega: {
+                title: "ω: Angular Frequency (rad/s)",
+                color: "text-purple-400",
+                desc: "Rate of phase change over time. Related to temporal period T = 2π/ω and cyclic frequency f = ω / (2π)."
+            },
+            beta: {
+                title: "β: Phase Constant / Wavenumber (rad/m)",
+                color: "text-emerald-400",
+                desc: "Spatial phase rate change along propagation path z. Wavelength is inversely proportional: λ = 2π/β."
+            },
+            sign: {
+                title: "+βz: Spatial Phase Term & Direction",
+                color: "text-rose-400",
+                desc: "The term (+βz) forces wave phase velocity u_p = -ω/β, meaning the wave pattern propagates in the NEGATIVE z direction (-ẑ)."
+            }
+        };
+
+        // Application State
+        const state = {
+            E0: 5.0,
+            omega: 3.14159,
+            beta: 1.57079,
+            phi0: 0.0,
+            sign: 1, // +1 for (+beta*z -> propagation -z), -1 for (-beta*z -> propagation +z)
+            isPaused: false,
+            speed: 0.7,
+            time: 0,
+            viewMode3D: true,
+            showEnvelope: true,
+            showBField: true,
+            activeTerm: null
+        };
+
+        // DOM elements
+        const sliderE0 = document.getElementById('slider-E0');
+        const sliderOmega = document.getElementById('slider-omega');
+        const sliderBeta = document.getElementById('slider-beta');
+        const sliderPhi = document.getElementById('slider-phi');
+        const sliderSpeed = document.getElementById('slider-speed');
+        
+        const valE0 = document.getElementById('val-E0');
+        const valOmega = document.getElementById('val-omega');
+        const valBeta = document.getElementById('val-beta');
+        const valPhi = document.getElementById('val-phi');
+
+        const calcLambda = document.getElementById('calc-lambda');
+        const calcPeriod = document.getElementById('calc-period');
+        const calcFreq = document.getElementById('calc-freq');
+        const calcUp = document.getElementById('calc-up');
+        const calcKvector = document.getElementById('calc-kvector');
+        const calcEnergy = document.getElementById('calc-energy');
+        const badgeProp = document.getElementById('badge-propagation');
+
+        const btnPause = document.getElementById('btn-pause');
+        const btnStep = document.getElementById('btn-step');
+        const btnToggleSign = document.getElementById('btn-toggle-sign');
+        const btnViewMode = document.getElementById('btn-view-mode');
+        const btnToggleEnvelope = document.getElementById('btn-toggle-envelope');
+        const btnToggleBField = document.getElementById('btn-toggle-bfield');
+        const btnReset = document.getElementById('btn-reset');
+        const pauseIcon = document.getElementById('pause-icon');
+        const signText = document.getElementById('sign-text');
+        const timeReadout = document.getElementById('time-readout');
+
+        const eqKaTeX = document.getElementById('equation-katex');
+        const eqBKaTeX = document.getElementById('equation-b-katex');
+        const termTitle = document.getElementById('term-title');
+        const termDesc = document.getElementById('term-desc');
+
+        // Render KaTeX Equation & Math Elements
+        function updateEquationLaTeX() {
+            const signStr = state.sign > 0 ? "+" : "-";
+            const formulaE = `E_x(z,t) = ${state.E0.toFixed(1)} \\cos\\left(${state.omega.toFixed(2)} t ${signStr} ${state.beta.toFixed(2)} z - ${state.phi0.toFixed(2)}\\right) \\,\\hat{x}`;
+            katex.render(formulaE, eqKaTeX, {
+                throwOnError: false,
+                displayMode: true
+            });
+
+            // Calculate peak B field amplitude B_0 = E_0 / u_p
+            const up = state.omega / state.beta;
+            const B0 = state.E0 / up;
+            const formulaB = `B_y(z,t) = ${B0.toFixed(2)} \\cos\\left(${state.omega.toFixed(2)} t ${signStr} ${state.beta.toFixed(2)} z - ${state.phi0.toFixed(2)}\\right) \\,\\hat{y}`;
+            katex.render(formulaB, eqBKaTeX, {
+                throwOnError: false,
+                displayMode: true
+            });
+
+            // Render live math formulas inside calculated parameter spans directly via KaTeX
+            const kVecFormula = `\\vec{k} = ${state.sign > 0 ? '-' : '+'}${state.beta.toFixed(2)}\\hat{z}\\text{ rad/m}`;
+            katex.render(kVecFormula, calcKvector, { throwOnError: false });
+
+            const bRelFormula = `B_0 = \\frac{E_0}{u_p} = ${B0.toFixed(2)}\\text{ T}`;
+            katex.render(bRelFormula, calcEnergy, { throwOnError: false });
+
+            // Re-render overall static Math expressions across DOM
+            if (window.renderMathInElement) {
+                renderMathInElement(document.body, {
+                    delimiters: [
+                        {left: '$$', right: '$$', display: true},
+                        {left: '$', right: '$', display: false}
+                    ],
+                    throwOnError: false
+                });
+            }
+        }
+
+        // Calculations & UI Readouts Update
+        function updateCalculations() {
+            const lambda = (2 * Math.PI) / state.beta;
+            const period = (2 * Math.PI) / state.omega;
+            const freq = state.omega / (2 * Math.PI);
+            const up = state.omega / state.beta;
+
+            calcLambda.innerText = `${lambda.toFixed(2)} m`;
+            calcPeriod.innerText = `${period.toFixed(2)} s`;
+            calcFreq.innerText = `${freq.toFixed(2)} Hz`;
+            calcUp.innerText = `${up.toFixed(2)} m/s`;
+
+            if (state.sign > 0) {
+                badgeProp.className = "px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-950 text-emerald-400 border border-emerald-800";
+                badgeProp.innerText = "Propagating -ẑ";
+                signText.innerHTML = "+$\\beta z$ (Propagates $-\\hat{z}$)";
+            } else {
+                badgeProp.className = "px-2 py-0.5 rounded text-[10px] font-mono bg-rose-950 text-rose-400 border border-rose-800";
+                badgeProp.innerText = "Propagates +ẑ";
+                signText.innerHTML = "-$\\beta z$ (Propagates $+\\hat{z}$)";
+            }
+
+            updateEquationLaTeX();
+        }
+
+        // Event Listeners for Sliders & Controls
+        sliderE0.addEventListener('input', (e) => {
+            state.E0 = parseFloat(e.target.value);
+            valE0.innerText = `${state.E0.toFixed(1)} V/m`;
+            updateCalculations();
+        });
+
+        sliderOmega.addEventListener('input', (e) => {
+            state.omega = parseFloat(e.target.value);
+            valOmega.innerText = `${state.omega.toFixed(2)} rad/s`;
+            updateCalculations();
+        });
+
+        sliderBeta.addEventListener('input', (e) => {
+            state.beta = parseFloat(e.target.value);
+            valBeta.innerText = `${state.beta.toFixed(2)} rad/m`;
+            updateCalculations();
+        });
+
+        sliderPhi.addEventListener('input', (e) => {
+            state.phi0 = parseFloat(e.target.value);
+            const deg = (state.phi0 * 180 / Math.PI).toFixed(0);
+            valPhi.innerText = `${state.phi0.toFixed(2)} rad (${deg}°)`;
+            updateCalculations();
+        });
+
+        sliderSpeed.addEventListener('input', (e) => {
+            state.speed = parseFloat(e.target.value);
+        });
+
+        btnToggleSign.addEventListener('click', () => {
+            state.sign *= -1;
+            updateCalculations();
+        });
+
+        btnPause.addEventListener('click', () => {
+            state.isPaused = !state.isPaused;
+            pauseIcon.className = state.isPaused ? "fa-solid fa-play" : "fa-solid fa-pause";
+        });
+
+        btnStep.addEventListener('click', () => {
+            state.time += 0.05;
+            timeReadout.innerText = state.time.toFixed(2);
+        });
+
+        btnToggleEnvelope.addEventListener('click', () => {
+            state.showEnvelope = !state.showEnvelope;
+            btnToggleEnvelope.classList.toggle('bg-cyan-900', state.showEnvelope);
+        });
+
+        btnToggleBField.addEventListener('click', () => {
+            state.showBField = !state.showBField;
+            btnToggleBField.classList.toggle('bg-emerald-950', state.showBField);
+            btnToggleBField.classList.toggle('bg-slate-800', !state.showBField);
+        });
+
+        btnViewMode.addEventListener('click', () => {
+            state.viewMode3D = !state.viewMode3D;
+            resetCamera();
+        });
+
+        btnReset.addEventListener('click', () => {
+            state.E0 = 5.0;
+            state.omega = 3.14159;
+            state.beta = 1.57079;
+            state.phi0 = 0.0;
+            state.sign = 1;
+            state.speed = 0.7;
+            state.time = 0;
+
+            sliderE0.value = 5.0;
+            sliderOmega.value = 3.14159;
+            sliderBeta.value = 1.57079;
+            sliderPhi.value = 0.0;
+            sliderSpeed.value = 0.7;
+
+            valE0.innerText = "5.0 V/m";
+            valOmega.innerText = "3.14 rad/s";
+            valBeta.innerText = "1.57 rad/m";
+            valPhi.innerText = "0.00 rad (0°)";
+
+            updateCalculations();
+        });
+
+        // Term Selection Handler
+        document.querySelectorAll('.term-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.term-btn').forEach(b => b.classList.remove('ring-2', 'ring-cyan-400', 'bg-slate-800'));
+                btn.classList.add('ring-2', 'ring-cyan-400', 'bg-slate-800');
+                
+                const termKey = btn.getAttribute('data-term');
+                const info = termData[termKey];
+                if (info) {
+                    termTitle.className = `font-semibold mb-1 flex items-center gap-1.5 ${info.color}`;
+                    termTitle.innerHTML = `<i class="fa-solid fa-circle-info"></i> ${info.title}`;
+                    termDesc.innerText = info.desc;
+                }
+            });
+        });
+
+        // THREE.JS Visualizer Setup
+        let scene, camera, renderer;
+        let vectorGroup, axisGroup;
+        const canvasContainer = document.getElementById('canvas-container');
+        const canvasElement = document.getElementById('wave-canvas');
+
+        function initThreeJS() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x020617);
+
+            camera = new THREE.PerspectiveCamera(45, canvasContainer.clientWidth / canvasContainer.clientHeight, 0.1, 1000);
+            
+            renderer = new THREE.WebGLRenderer({ canvas: canvasElement, antialias: true });
+            renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+            // Ambient & Directional Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(10, 20, 15);
+            scene.add(dirLight);
+
+            // Container groups
+            vectorGroup = new THREE.Group();
+            axisGroup = new THREE.Group();
+            scene.add(vectorGroup);
+            scene.add(axisGroup);
+
+            buildAxes();
+            resetCamera();
+
+            // Simple Mouse Interaction for Camera Drag Orbit
+            let isDragging = false;
+            let prevMouse = { x: 0, y: 0 };
+
+            canvasElement.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                prevMouse = { x: e.clientX, y: e.clientY };
+            });
+
+            window.addEventListener('mouseup', () => isDragging = false);
+
+            canvasElement.addEventListener('mousemove', (e) => {
+                if (!isDragging || !state.viewMode3D) return;
+                const deltaX = e.clientX - prevMouse.x;
+                const deltaY = e.clientY - prevMouse.y;
+
+                const radius = camera.position.distanceTo(scene.position);
+                let theta = Math.atan2(camera.position.x, camera.position.z);
+                let phi = Math.acos(camera.position.y / radius);
+
+                theta -= deltaX * 0.008;
+                phi = Math.max(0.1, Math.min(Math.PI - 0.1, phi - deltaY * 0.008));
+
+                camera.position.x = radius * Math.sin(phi) * Math.sin(theta);
+                camera.position.y = radius * Math.cos(phi);
+                camera.position.z = radius * Math.sin(phi) * Math.cos(theta);
+                camera.lookAt(0, 0, 0);
+
+                prevMouse = { x: e.clientX, y: e.clientY };
+            });
+
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function resetCamera() {
+            if (state.viewMode3D) {
+                camera.position.set(12, 8, 16);
+                camera.lookAt(0, 0, 0);
+            } else {
+                // 2D Side View Projection
+                camera.position.set(0, 0, 20);
+                camera.lookAt(0, 0, 0);
+            }
+        }
+
+        function buildAxes() {
+            // Z-axis line (Propagation Path)
+            const zMat = new THREE.LineBasicMaterial({ color: 0x06b6d4, linewidth: 2 });
+            const zGeo = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(0, 0, -10),
+                new THREE.Vector3(0, 0, 10)
+            ]);
+            axisGroup.add(new THREE.Line(zGeo, zMat));
+
+            // X-axis line (Electric Field Direction)
+            const xMat = new THREE.LineBasicMaterial({ color: 0xf59e0b, linewidth: 2 });
+            const xGeo = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(-6, 0, 0),
+                new THREE.Vector3(6, 0, 0)
+            ]);
+            axisGroup.add(new THREE.Line(xGeo, xMat));
+
+            // Y-axis line (Magnetic Field Direction)
+            const yMat = new THREE.LineBasicMaterial({ color: 0x10b981, linewidth: 2 });
+            const yGeo = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(0, -6, 0),
+                new THREE.Vector3(0, 6, 0)
+            ]);
+            axisGroup.add(new THREE.Line(yGeo, yMat));
+
+            // Spatial Grid
+            const gridHelper = new THREE.GridHelper(20, 20, 0x334155, 0x1e293b);
+            gridHelper.position.y = -5;
+            axisGroup.add(gridHelper);
+        }
+
+        function renderWaveGeometry() {
+            // Clear previous frame vectors
+            while (vectorGroup.children.length > 0) {
+                const obj = vectorGroup.children.pop();
+                if (obj && obj.geometry) obj.geometry.dispose();
+                if (obj && obj.material) obj.material.dispose();
+            }
+
+            const points = [];
+            const magPoints = [];
+            const upperEnvelopePoints = [];
+            const lowerEnvelopePoints = [];
+            
+            const numPoints = 120;
+            const zMin = -9;
+            const zMax = 9;
+
+            const scaleE0 = state.E0 * 0.5; // Scale down visually for canvas fit
+            const scaleB0 = state.showBField ? scaleE0 : 0;
+
+            for (let i = 0; i <= numPoints; i++) {
+                const z = zMin + (i / numPoints) * (zMax - zMin);
+                
+                // Core Equation: E_x(z, t) = E_0 * cos(omega * t + sign * beta * z - phi_0)
+                const phase = state.omega * state.time + (state.sign * state.beta * z) - state.phi0;
+                const Ex = scaleE0 * Math.cos(phase);
+                // Magnetic field By is orthogonal along y-axis in phase with Ex
+                const By = scaleB0 * Math.cos(phase);
+
+                points.push(new THREE.Vector3(Ex, 0, z));
+                if (state.showBField) {
+                    magPoints.push(new THREE.Vector3(0, By, z));
+                }
+
+                upperEnvelopePoints.push(new THREE.Vector3(scaleE0, 0, z));
+                lowerEnvelopePoints.push(new THREE.Vector3(-scaleE0, 0, z));
+
+                // Sample vertical vector arrows at key intervals
+                if (i % 3 === 0) {
+                    // Electric Field Vector (x-axis)
+                    const arrowMat = new THREE.LineBasicMaterial({
+                        color: Ex >= 0 ? 0xf59e0b : 0xd97706,
+                        transparent: true,
+                        opacity: 0.8
+                    });
+                    const arrowGeo = new THREE.BufferGeometry().setFromPoints([
+                        new THREE.Vector3(0, 0, z),
+                        new THREE.Vector3(Ex, 0, z)
+                    ]);
+                    vectorGroup.add(new THREE.Line(arrowGeo, arrowMat));
+
+                    const dotGeo = new THREE.SphereGeometry(0.08, 8, 8);
+                    const dotMat = new THREE.MeshBasicMaterial({ color: 0xfbbf24 });
+                    const dotMesh = new THREE.Mesh(dotGeo, dotMat);
+                    dotMesh.position.set(Ex, 0, z);
+                    vectorGroup.add(dotMesh);
+
+                    // Magnetic Field Vector (y-axis)
+                    if (state.showBField) {
+                        const magMat = new THREE.LineBasicMaterial({
+                            color: 0x10b981,
+                            transparent: true,
+                            opacity: 0.8
+                        });
+                        const magGeo = new THREE.BufferGeometry().setFromPoints([
+                            new THREE.Vector3(0, 0, z),
+                            new THREE.Vector3(0, By, z)
+                        ]);
+                        vectorGroup.add(new THREE.Line(magGeo, magMat));
+
+                        const magDotGeo = new THREE.SphereGeometry(0.08, 8, 8);
+                        const magDotMat = new THREE.MeshBasicMaterial({ color: 0x34d399 });
+                        const magDotMesh = new THREE.Mesh(magDotGeo, magDotMat);
+                        magDotMesh.position.set(0, By, z);
+                        vectorGroup.add(magDotMesh);
+                    }
+                }
+            }
+
+            // Main Electric Waveform Curve Line (Ex)
+            const curveGeo = new THREE.BufferGeometry().setFromPoints(points);
+            const curveMat = new THREE.LineBasicMaterial({ color: 0xf59e0b, linewidth: 3 });
+            const curveMesh = new THREE.Line(curveGeo, curveMat);
+            vectorGroup.add(curveMesh);
+
+            // Magnetic Waveform Curve Line (By)
+            if (state.showBField && magPoints.length > 0) {
+                const magCurveGeo = new THREE.BufferGeometry().setFromPoints(magPoints);
+                const magCurveMat = new THREE.LineBasicMaterial({ color: 0x10b981, linewidth: 3 });
+                const magCurveMesh = new THREE.Line(magCurveGeo, magCurveMat);
+                vectorGroup.add(magCurveMesh);
+            }
+
+            // Optional Amplitude Envelopes
+            if (state.showEnvelope) {
+                const envMat = new THREE.LineDashedMaterial({
+                    color: 0x64748b,
+                    dashSize: 0.3,
+                    gapSize: 0.2,
+                    transparent: true,
+                    opacity: 0.5
+                });
+
+                const upperGeo = new THREE.BufferGeometry().setFromPoints(upperEnvelopePoints);
+                const upperLine = new THREE.Line(upperGeo, envMat);
+                upperLine.computeLineDistances();
+                vectorGroup.add(upperLine);
+
+                const lowerGeo = new THREE.BufferGeometry().setFromPoints(lowerEnvelopePoints);
+                const lowerLine = new THREE.Line(lowerGeo, envMat);
+                lowerLine.computeLineDistances();
+                vectorGroup.add(lowerLine);
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = canvasContainer.clientWidth / canvasContainer.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
+        }
+
+        // Animation Loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (!state.isPaused) {
+                state.time += 0.025 * state.speed;
+                timeReadout.innerText = state.time.toFixed(2);
+            }
+
+            renderWaveGeometry();
+            renderer.render(scene, camera);
+        }
+
+        // Initialize App on Window Load
+        window.onload = function() {
+            initThreeJS();
+            updateCalculations();
+            animate();
+        };
+    </script>
+</body>
+</html>
